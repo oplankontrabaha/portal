@@ -363,7 +363,10 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:40px;cursor:p
 .ph{position:relative;aspect-ratio:1;border-radius:14px;overflow:hidden;background:#E9EFF8;cursor:pointer}
 .ph img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s var(--ease)}
 .ph:hover img{transform:scale(1.05)}
-.ph .cap{position:absolute;left:0;right:0;bottom:0;padding:16px 8px 6px;font-size:11px;color:#fff;background:linear-gradient(transparent,rgba(7,27,69,.85))}
+/* the date on a photo: a small, slightly see-through tag in the corner; it turns solid when the photo is pointed at */
+.ph .cap,.ph .tag{position:absolute;left:6px;max-width:calc(100% - 12px);padding:2px 7px;border-radius:999px;font-size:9.5px;font-weight:600;line-height:1.5;color:rgba(255,255,255,.95);background:rgba(7,27,69,.5);text-shadow:0 1px 2px rgba(7,27,69,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .4s var(--ease)}
+.ph .cap{bottom:6px}
+.ph:hover .cap,.ph:hover .tag,.ph:focus-visible .cap,.ph:focus-visible .tag{background:rgba(7,27,69,.8)}
 .ph.broken{display:grid;place-items:center;color:var(--soft)}
 .timeline{display:flex;flex-direction:column}
 .tl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;padding:10px 0;border-bottom:1px solid var(--line-2)}
@@ -539,7 +542,7 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:40px;cursor:p
 .xgrid.fit td{padding:9px 7px}
 .xgrid.fit td.rn,.xgrid.fit th.rn{width:30px;padding-left:6px;padding-right:2px}
 .xgrid.fit .bar{min-width:54px}
-.ph .tag{position:absolute;left:6px;top:6px;font-size:10.5px;font-weight:700;color:#fff;background:rgba(7,27,69,.72);border-radius:7px;padding:2px 6px}
+.ph .tag{top:6px}
 
 /* ---------- background sending (outbox) ---------- */
 .sync-chip{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:999px;border:1px solid #CFE0FA;background:#EEF4FF;color:var(--navy);
@@ -886,8 +889,10 @@ body.classic .stat .num small{font-size:11px;font-weight:normal;color:#333}
 body.classic .photos-grid{gap:4px;grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
 body.classic .ph{border-radius:0;border:1px solid #A0A0A0}
 body.classic .ph:hover img{transform:none}
-body.classic .ph .cap{padding:2px 4px;font-size:11px;background:rgba(0,0,0,.62)}
-body.classic .ph .tag{border-radius:0;font-size:11px;font-weight:normal;background:rgba(0,0,0,.62);left:0;top:0}
+body.classic .ph .cap,body.classic .ph .tag{left:0;max-width:100%;padding:1px 4px;border-radius:0;font-size:10px;font-weight:normal;line-height:1.4;text-shadow:none;background:rgba(0,0,0,.45)}
+body.classic .ph .cap{bottom:0}
+body.classic .ph .tag{top:0}
+body.classic .ph:hover .cap,body.classic .ph:hover .tag,body.classic .ph:focus-visible .cap,body.classic .ph:focus-visible .tag{background:rgba(0,0,0,.72)}
 body.classic .tl{gap:6px;padding:4px 0;border-bottom:1px solid #E6E6E6;grid-template-columns:minmax(0,1fr)}
 body.classic .tl.entry{grid-template-columns:minmax(0,1fr) auto}
 body.classic .tl.entry .acts{gap:3px;grid-column:auto}
@@ -1708,9 +1713,13 @@ async function waterwayPicker(el, o) {
 
 function photoGrid(photos, start) {
   if (!photos || !photos.length) return '<div class="empty">' + tile('image', 'soft', 'lg') + 'No photos yet.</div>';
-  return '<div class="photos-grid">' + photos.map((p, i) =>
-    '<div class="ph" data-ph="' + ((start || 0) + i) + '" tabindex="0"><img loading="lazy" alt="" src="' + esc(p.url) + '=w400" onerror="this.parentNode.classList.add(\'broken\');this.remove()">' +
-    '<div class="cap">' + esc(dateLabel(p.taken || p.uploaded)) + '</div></div>').join('') + '</div>';
+  /* The tile carries the day only, as a small tag. The day and time show when the photo is pointed at, and in its details. */
+  return '<div class="photos-grid">' + photos.map((p, i) => {
+    const when = p.taken || p.uploaded, full = dateLabel(when);
+    return '<div class="ph" data-ph="' + ((start || 0) + i) + '" tabindex="0"' + (when ? ' title="' + esc((p.taken ? 'Taken ' : 'Uploaded ') + full) + '"' : '') +
+      '><img loading="lazy" alt="" src="' + esc(p.url) + '=w400" onerror="this.parentNode.classList.add(\'broken\');this.remove()">' +
+      '<div class="cap">' + esc(full.split(' · ')[0]) + '</div></div>';
+  }).join('') + '</div>';
 }
 /* Click a thumbnail → the photo with its details. Administrators also get
    "Delete photo"; onDeleted(p) runs after a delete. */
@@ -5518,7 +5527,8 @@ ROUTES.daily = async (el, args) => {
       return '<div class="card pgroup"><div class="pgroup-head"><b>' + esc(titleCase(g.name)) + '</b><span class="pill navy">' + esc(g.abbr || '—') + '</span>' +
         '<span class="small muted pg-sub">' + esc(g.site) + ' · ' + g.items.length + ' photo' + (g.items.length === 1 ? '' : 's') + (offices.length ? ' · ' + esc(offices.join(', ')) : '') + '</span>' +
         '<a class="link small pg-open" href="#/waterway/' + encodePath(g.name, g.site) + '">Open waterway ' + ic('chev') + '</a></div>' +
-        '<div class="photos-grid">' + g.items.map(x => '<div class="ph" data-ph="' + x.i + '" tabindex="0"><img loading="lazy" decoding="async" alt="" src="' + esc(x.p.url) +
+        '<div class="photos-grid">' + g.items.map(x => '<div class="ph" data-ph="' + x.i + '" tabindex="0" title="' + esc('Uploaded ' + timeLabel(x.p.uploaded) + (x.p.taken ? ' · taken ' + dateLabel(x.p.taken) : ' · no date taken')) +
+          '"><img loading="lazy" decoding="async" alt="" src="' + esc(x.p.url) +
           '=w400" onerror="this.parentNode.classList.add(\'broken\');this.remove()"><span class="tag">' + esc(timeLabel(x.p.uploaded)) + '</span>' +
           '<div class="cap">' + (x.p.taken ? 'Taken ' + esc(dateLabel(x.p.taken).split(' · ')[0]) : 'No date taken') + '</div></div>').join('') + '</div></div>';
     }).join('') + (d.more ? '<div class="empty small">' + d.more + ' more photos were uploaded this day. Choose a region to narrow the list.</div>' : '');
